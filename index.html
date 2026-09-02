@@ -1,55 +1,969 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Portfolio Gallery</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<!-- Bootstrap CSS -->
+
+<link
+  href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+  rel="stylesheet"
+>
+
 <style>
-body{margin:0;background:#f8f9fa}
-.carousel-item{height:min(65vh,560px);min-height:320px;background:#111;position:relative}
-.carousel-item img{width:100%;height:100%;object-fit:cover;opacity:.82}
-.slide-overlay{position:absolute;left:0;right:0;bottom:0;padding:70px 8% 45px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.85))}
-.slide-overlay h2{font-weight:700;margin-bottom:8px}.slide-meta{font-size:1rem}.slide-subject{font-size:1.15rem;font-weight:600;margin-top:8px}
-.empty{min-height:350px;display:flex;align-items:center;justify-content:center;color:#777}
+body {
+  margin: 0;
+  background: #f8f9fa;
+}
+
+/* ==============================
+   CAROUSEL
+============================== */
+
+#carousel {
+  width: 100%;
+}
+
+.carousel-item {
+  height: min(65vh, 560px);
+  min-height: 320px;
+  background: #111;
+  position: relative;
+  overflow: hidden;
+}
+
+.carousel-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.82;
+}
+
+/* ==============================
+   OVERLAY
+============================== */
+
+.slide-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  padding: 80px 8% 45px;
+
+  color: #fff;
+
+  background:
+    linear-gradient(
+      transparent,
+      rgba(0, 0, 0, 0.9)
+    );
+}
+
+.slide-overlay h2 {
+  font-weight: 700;
+  margin-bottom: 8px;
+  font-size: 2rem;
+}
+
+.slide-meta {
+  font-size: 1rem;
+  margin-top: 5px;
+}
+
+.slide-subject {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+/* ==============================
+   LOADING / EMPTY / ERROR
+============================== */
+
+.status-box {
+  min-height: 350px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
+
+  padding: 30px;
+
+  color: #666;
+}
+
+.status-box .spinner-border {
+  width: 2rem;
+  height: 2rem;
+}
+
+/* ==============================
+   MOBILE
+============================== */
+
+@media (max-width: 768px) {
+
+  .carousel-item {
+    height: 60vh;
+    min-height: 300px;
+  }
+
+  .slide-overlay {
+    padding: 70px 6% 30px;
+  }
+
+  .slide-overlay h2 {
+    font-size: 1.5rem;
+  }
+
+  .slide-meta {
+    font-size: 0.9rem;
+  }
+
+  .slide-subject {
+    font-size: 1rem;
+  }
+
+}
 </style>
+
 </head>
+
 <body>
-<div id="carousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="5000">
-  <div id="indicators" class="carousel-indicators"></div>
-  <div id="slides" class="carousel-inner"></div>
-  <button class="carousel-control-prev" type="button" data-bs-target="#carousel" data-bs-slide="prev"><span class="carousel-control-prev-icon"></span></button>
-  <button class="carousel-control-next" type="button" data-bs-target="#carousel" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>
+
+<!-- ==============================
+     CAROUSEL
+============================== -->
+
+<div
+  id="carousel"
+  class="carousel slide"
+  data-bs-interval="5000"
+>
+
+  <!-- Indicators -->
+
+  <div
+    id="indicators"
+    class="carousel-indicators"
+  ></div>
+
+  <!-- Slides -->
+
+  <div
+    id="slides"
+    class="carousel-inner"
+  ></div>
+
+  <!-- Previous -->
+
+<button
+class="carousel-control-prev"
+type="button"
+data-bs-target="#carousel"
+data-bs-slide="prev"
+
+>
+
+```
+<span
+```
+
+```
+  class="carousel-control-prev-icon"
+  aria-hidden="true"
+></span>
+
+<span class="visually-hidden">
+  Previous
+</span>
+```
+
+  </button>
+
+  <!-- Next -->
+
+<button
+class="carousel-control-next"
+type="button"
+data-bs-target="#carousel"
+data-bs-slide="next"
+
+>
+
+```
+<span
+```
+
+```
+  class="carousel-control-next-icon"
+  aria-hidden="true"
+></span>
+
+<span class="visually-hidden">
+  Next
+</span>
+```
+
+  </button>
+
 </div>
-<div id="empty" class="empty">Loading slides...</div>
+
+<!-- ==============================
+     STATUS
+============================== -->
+
+<div
+  id="status"
+  class="status-box"
+>
+  <div>
+    <div
+      class="spinner-border mb-3"
+      role="status"
+    ></div>
+
+```
+<div>
+  Loading slides...
+</div>
+```
+
+  </div>
+</div>
+
+<!-- ==============================
+     FIREBASE + SLIDES
+============================== -->
+
 <script type="module">
+
+/*
+====================================================
+ FIREBASE IMPORT
+====================================================
+*/
+
 import { db } from "./firebase-config.js";
-import { collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
-const slidesEl=document.getElementById("slides"), indEl=document.getElementById("indicators"), empty=document.getElementById("empty");
-function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
+import {
+  collection,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 
-try{
- const snap=await getDocs(query(collection(db,"slides"),orderBy("createdAt","desc")));
- if(snap.empty){empty.textContent="No slides uploaded yet."; document.getElementById("carousel").style.display="none";}
- else{
-   empty.style.display="none";
-   snap.forEach((doc,i)=>{
-     const p=doc.data();
-     indEl.insertAdjacentHTML("beforeend",`<button type="button" data-bs-target="#carousel" data-bs-slide-to="${i}" class="${i===0?"active":""}"></button>`);
-     slidesEl.insertAdjacentHTML("beforeend",`
-       <div class="carousel-item ${i===0?"active":""}">
-         <img src="${esc(p.imageUrl)}" alt="${esc(p.name)}">
-         <div class="slide-overlay">
-           <h2>${esc(p.name)}</h2>
-           <div class="slide-meta">${esc(p.day)} &nbsp;|&nbsp; ${esc(p.date)} &nbsp;|&nbsp; ${esc(p.startTime)} - ${esc(p.endTime)}</div>
-           <div class="slide-subject">${esc(p.subject)}</div>
-         </div>
-       </div>`);
-   });
- }
-}catch(e){console.error(e);empty.textContent="Unable to load slides. Check Firestore Rules and configuration.";}
+
+/*
+====================================================
+ DOM ELEMENTS
+====================================================
+*/
+
+const carousel = document.getElementById("carousel");
+
+const slidesEl =
+  document.getElementById("slides");
+
+const indicatorsEl =
+  document.getElementById("indicators");
+
+const statusEl =
+  document.getElementById("status");
+
+
+/*
+====================================================
+ HTML ESCAPE
+====================================================
+*/
+
+function escapeHtml(value) {
+
+  return String(value ?? "")
+    .replace(/[&<>"']/g, function(char) {
+
+      const map = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      };
+
+      return map[char];
+
+    });
+
+}
+
+
+/*
+====================================================
+ FORMAT DATE
+====================================================
+*/
+
+function formatDate(value) {
+
+  if (!value) {
+    return "";
+  }
+
+  /*
+    Firestore Timestamp
+  */
+
+  if (
+    typeof value === "object" &&
+    typeof value.toDate === "function"
+  ) {
+
+    try {
+
+      return value
+        .toDate()
+        .toLocaleDateString();
+
+    } catch (error) {
+
+      return "";
+
+    }
+
+  }
+
+  return String(value);
+
+}
+
+
+/*
+====================================================
+ GET IMAGE URL
+====================================================
+*/
+
+function getImageUrl(data) {
+
+  /*
+    Your admin panel saves imageUrl.
+  */
+
+  if (data.imageUrl) {
+    return data.imageUrl;
+  }
+
+  /*
+    Backup in case another document
+    uses imageURL.
+  */
+
+  if (data.imageURL) {
+    return data.imageURL;
+  }
+
+  /*
+    Backup for image field.
+  */
+
+  if (data.image) {
+    return data.image;
+  }
+
+  return "";
+
+}
+
+
+/*
+====================================================
+ LOAD SLIDES
+====================================================
+*/
+
+async function loadSlides() {
+
+  console.log("=================================");
+  console.log("Loading slides from Firestore...");
+  console.log("Collection: slides");
+  console.log("=================================");
+
+  try {
+
+    /*
+    ================================================
+    GET ALL DOCUMENTS
+    ================================================
+    
+    IMPORTANT:
+    We intentionally DO NOT use orderBy().
+    
+    This prevents problems when:
+    - createdAt is missing
+    - createdAt has different data types
+    - old documents don't have createdAt
+    */
+
+    const snapshot =
+      await getDocs(
+        collection(db, "slides")
+      );
+
+
+    console.log(
+      "Firestore documents found:",
+      snapshot.size
+    );
+
+
+    /*
+    ================================================
+    NO SLIDES
+    ================================================
+    */
+
+    if (snapshot.empty) {
+
+      carousel.style.display = "none";
+
+      statusEl.innerHTML = `
+        <div>
+          <h5 class="mb-2">
+            No slides available
+          </h5>
+
+          <p class="mb-0">
+            No slides have been uploaded yet.
+          </p>
+        </div>
+      `;
+
+      return;
+
+    }
+
+
+    /*
+    ================================================
+    CONVERT FIRESTORE DATA TO ARRAY
+    ================================================
+    */
+
+    const slides = [];
+
+    snapshot.forEach(function(doc) {
+
+      const data = doc.data();
+
+      console.log(
+        "Slide:",
+        doc.id,
+        data
+      );
+
+      slides.push({
+        id: doc.id,
+        data: data
+      });
+
+    });
+
+
+    /*
+    ================================================
+    SORT BY CREATED AT
+    ================================================
+    
+    This is done in JavaScript instead of
+    Firestore orderBy().
+    
+    Therefore missing createdAt won't break loading.
+    */
+
+    slides.sort(function(a, b) {
+
+      const dateA =
+        a.data.createdAt?.toMillis
+          ? a.data.createdAt.toMillis()
+          : 0;
+
+      const dateB =
+        b.data.createdAt?.toMillis
+          ? b.data.createdAt.toMillis()
+          : 0;
+
+      return dateB - dateA;
+
+    });
+
+
+    /*
+    ================================================
+    CLEAR OLD CONTENT
+    ================================================
+    */
+
+    slidesEl.innerHTML = "";
+
+    indicatorsEl.innerHTML = "";
+
+
+    /*
+    ================================================
+    CREATE SLIDES
+    ================================================
+    */
+
+    slides.forEach(function(item, index) {
+
+      const p = item.data;
+
+      /*
+      -----------------------------------------------
+      DATA
+      -----------------------------------------------
+      */
+
+      const name =
+        p.name || "Untitled";
+
+      const day =
+        p.day || "";
+
+      const date =
+        p.date || "";
+
+      const startTime =
+        p.startTime || "";
+
+      const endTime =
+        p.endTime || "";
+
+      const subject =
+        p.subject || "";
+
+      const imageUrl =
+        getImageUrl(p);
+
+
+      /*
+      -----------------------------------------------
+      IMAGE CHECK
+      -----------------------------------------------
+      */
+
+      if (!imageUrl) {
+
+        console.warn(
+          "No image URL found for slide:",
+          item.id,
+          p
+        );
+
+      }
+
+
+      /*
+      -----------------------------------------------
+      INDICATOR
+      -----------------------------------------------
+      */
+
+      const indicator =
+        document.createElement("button");
+
+      indicator.type = "button";
+
+      indicator.setAttribute(
+        "data-bs-target",
+        "#carousel"
+      );
+
+      indicator.setAttribute(
+        "data-bs-slide-to",
+        String(index)
+      );
+
+      indicator.setAttribute(
+        "aria-label",
+        `Slide ${index + 1}`
+      );
+
+      if (index === 0) {
+
+        indicator.classList.add("active");
+
+        indicator.setAttribute(
+          "aria-current",
+          "true"
+        );
+
+      }
+
+      indicatorsEl.appendChild(indicator);
+
+
+      /*
+      -----------------------------------------------
+      CAROUSEL ITEM
+      -----------------------------------------------
+      */
+
+      const slide =
+        document.createElement("div");
+
+      slide.className =
+        "carousel-item" +
+        (index === 0 ? " active" : "");
+
+
+      /*
+      -----------------------------------------------
+      IMAGE
+      -----------------------------------------------
+      */
+
+      const img =
+        document.createElement("img");
+
+      img.src = imageUrl;
+
+      img.alt = name;
+
+      img.loading =
+        index === 0 ? "eager" : "lazy";
+
+      /*
+        If image fails, don't break carousel.
+      */
+
+      img.onerror = function() {
+
+        console.error(
+          "Image failed to load:",
+          imageUrl
+        );
+
+        img.style.display = "none";
+
+      };
+
+
+      /*
+      -----------------------------------------------
+      OVERLAY
+      -----------------------------------------------
+      */
+
+      const overlay =
+        document.createElement("div");
+
+      overlay.className =
+        "slide-overlay";
+
+
+      /*
+      -----------------------------------------------
+      TITLE
+      -----------------------------------------------
+      */
+
+      const title =
+        document.createElement("h2");
+
+      title.textContent =
+        name;
+
+
+      /*
+      -----------------------------------------------
+      META
+      -----------------------------------------------
+      */
+
+      const meta =
+        document.createElement("div");
+
+      meta.className =
+        "slide-meta";
+
+
+      const dateText = [
+        day,
+        date
+      ]
+      .filter(Boolean)
+      .join(" | ");
+
+
+      const timeText = [
+        startTime,
+        endTime
+      ]
+      .filter(Boolean)
+      .join(" - ");
+
+
+      if (dateText && timeText) {
+
+        meta.textContent =
+          `${dateText} | ${timeText}`;
+
+      }
+      else if (dateText) {
+
+        meta.textContent =
+          dateText;
+
+      }
+      else if (timeText) {
+
+        meta.textContent =
+          timeText;
+
+      }
+
+
+      /*
+      -----------------------------------------------
+      SUBJECT
+      -----------------------------------------------
+      */
+
+      const subjectEl =
+        document.createElement("div");
+
+      subjectEl.className =
+        "slide-subject";
+
+      subjectEl.textContent =
+        subject;
+
+
+      /*
+      -----------------------------------------------
+      BUILD SLIDE
+      -----------------------------------------------
+      */
+
+      overlay.appendChild(title);
+
+      if (meta.textContent) {
+
+        overlay.appendChild(meta);
+
+      }
+
+      if (subject) {
+
+        overlay.appendChild(subjectEl);
+
+      }
+
+      slide.appendChild(img);
+
+      slide.appendChild(overlay);
+
+      slidesEl.appendChild(slide);
+
+    });
+
+
+    /*
+    ================================================
+    HIDE LOADING
+    ================================================
+    */
+
+    statusEl.style.display = "none";
+
+    carousel.style.display = "block";
+
+
+    /*
+    ================================================
+    INITIALIZE BOOTSTRAP CAROUSEL
+    ================================================
+    */
+
+    const carouselElement =
+      document.getElementById("carousel");
+
+
+    if (
+      window.bootstrap &&
+      bootstrap.Carousel
+    ) {
+
+      const carouselInstance =
+        bootstrap.Carousel.getOrCreateInstance(
+          carouselElement,
+          {
+            interval: 5000,
+            ride: "carousel",
+            pause: "hover",
+            wrap: true
+          }
+        );
+
+      /*
+        Start carousel
+      */
+
+      carouselInstance.cycle();
+
+      console.log(
+        "Bootstrap carousel initialized successfully."
+      );
+
+    }
+    else {
+
+      console.error(
+        "Bootstrap JavaScript is not available."
+      );
+
+    }
+
+
+    console.log(
+      "Slides loaded successfully."
+    );
+
+  }
+
+  catch (error) {
+
+    console.error(
+      "================================="
+    );
+
+    console.error(
+      "FIRESTORE SLIDE ERROR"
+    );
+
+    console.error(
+      "Error code:",
+      error.code
+    );
+
+    console.error(
+      "Error message:",
+      error.message
+    );
+
+    console.error(
+      error
+    );
+
+    console.error(
+      "================================="
+    );
+
+
+    /*
+    ================================================
+    HIDE CAROUSEL
+    ================================================
+    */
+
+    carousel.style.display = "none";
+
+
+    /*
+    ================================================
+    SHOW ERROR
+    ================================================
+    */
+
+    let message =
+      "Unable to load slides.";
+
+
+    if (
+      error.code ===
+      "permission-denied"
+    ) {
+
+      message =
+        "Firestore permission denied. Please check your Firestore Rules.";
+
+    }
+
+    else if (
+      error.code ===
+      "failed-precondition"
+    ) {
+
+      message =
+        "Firestore query failed. Please check your Firebase configuration.";
+
+    }
+
+    else if (
+      error.code ===
+      "unavailable"
+    ) {
+
+      message =
+        "Firebase is temporarily unavailable. Please try again.";
+
+    }
+
+    else if (
+      error.message
+    ) {
+
+      message =
+        error.message;
+
+    }
+
+
+    statusEl.innerHTML = `
+      <div class="alert alert-danger m-3">
+        <h5>
+          Slide Loading Error
+        </h5>
+
+        <p class="mb-2">
+          ${escapeHtml(message)}
+        </p>
+
+        <small>
+          Open browser Console (F12) for more details.
+        </small>
+      </div>
+    `;
+
+  }
+
+}
+
+
+/*
+====================================================
+ START
+====================================================
+*/
+
+loadSlides();
+
 </script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- ==============================
+     BOOTSTRAP JS
+============================== -->
+
+<script
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+></script>
+
 </body>
 </html>

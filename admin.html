@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body{background:#f5f6f8}.wrap{max-width:1100px}.preview{width:110px;height:65px;object-fit:cover;border-radius:7px}.card{border:0}
+</style>
+</head>
+<body>
+<nav class="navbar bg-dark navbar-dark">
+<div class="container wrap">
+<span class="navbar-brand">Admin Dashboard</span>
+<div>
+<a href="index.html" target="_blank" class="btn btn-sm btn-outline-light me-2">View Site</a>
+<button id="logout" type="button" class="btn btn-sm btn-warning">Logout</button>
+</div>
+</div>
+</nav>
+
+<main class="container wrap py-4">
+<div class="card shadow-sm mb-4"><div class="card-body">
+<h4 id="formTitle">Add New Slide</h4>
+<form id="slideForm" class="row g-3">
+<div class="col-md-6"><label class="form-label">Image</label><input id="image" type="file" accept="image/*" class="form-control"><div class="form-text">Required for a new slide; optional when editing.</div></div>
+<div class="col-md-6"><label class="form-label">Name</label><input id="name" class="form-control" required></div>
+<div class="col-md-4"><label class="form-label">Date</label><input id="date" type="date" class="form-control" required></div>
+<div class="col-md-4"><label class="form-label">Day</label><input id="day" class="form-control" readonly></div>
+<div class="col-md-4"><label class="form-label">Start Time</label><input id="startTime" type="time" class="form-control" required></div>
+<div class="col-md-4"><label class="form-label">End Time</label><input id="endTime" type="time" class="form-control" required></div>
+<div class="col-md-8"><label class="form-label">Subject</label><input id="subject" class="form-control" required></div>
+<div class="col-12">
+<button type="submit" class="btn btn-primary" id="submitBtn">Upload Slide</button>
+<button type="button" class="btn btn-secondary ms-2 d-none" id="cancelBtn">Cancel Edit</button>
+</div>
+<div class="col-12"><div id="statusBox"></div></div>
+</form>
+</div></div>
+
+<div class="card shadow-sm"><div class="card-body">
+<h4>Uploaded Slides</h4>
+<div class="table-responsive"><table class="table align-middle">
+<thead><tr><th>Image</th><th>Name</th><th>Date</th><th>Time</th><th>Subject</th><th>Action</th></tr></thead>
+<tbody id="list"></tbody>
+</table></div>
+</div></div>
+</main>
+
+<script type="module">
+import {auth,db} from "./firebase-config.js";
+import {onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import {collection,addDoc,getDocs,query,orderBy,doc,updateDoc,deleteDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+const slideForm=document.getElementById("slideForm");
+const imageInput=document.getElementById("image");
+const nameInput=document.getElementById("name");
+const dateInput=document.getElementById("date");
+const dayInput=document.getElementById("day");
+const startInput=document.getElementById("startTime");
+const endInput=document.getElementById("endTime");
+const subjectInput=document.getElementById("subject");
+const submitBtn=document.getElementById("submitBtn");
+const cancelBtn=document.getElementById("cancelBtn");
+const statusBox=document.getElementById("statusBox");
+const listBox=document.getElementById("list");
+const formTitle=document.getElementById("formTitle");
+const logoutBtn=document.getElementById("logout");
+
+let currentId=null;
+let currentImageUrl="";
+
+const CLOUD_NAME="y6kr5fnv";
+const UPLOAD_PRESET="medical";
+
+function esc(value){
+return String(value??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+
+function showStatus(message,type="info"){
+statusBox.innerHTML='<div class="alert alert-'+type+'">'+esc(message)+'</div>';
+}
+
+onAuthStateChanged(auth,user=>{
+if(!user){location.href="admin-login.html";return;}
+loadSlides();
+});
+
+logoutBtn.addEventListener("click",()=>signOut(auth));
+
+dateInput.addEventListener("change",()=>{
+if(!dateInput.value){dayInput.value="";return;}
+dayInput.value=new Date(dateInput.value+"T00:00:00").toLocaleDateString("en-US",{weekday:"long"});
+});
+
+function resetForm(){
+slideForm.reset();
+dayInput.value="";
+currentId=null;
+currentImageUrl="";
+formTitle.textContent="Add New Slide";
+submitBtn.textContent="Upload Slide";
+cancelBtn.classList.add("d-none");
+}
+
+cancelBtn.addEventListener("click",resetForm);
+
+async function uploadImage(file){
+if(!file)throw new Error("Please choose an image.");
+if(!file.type.startsWith("image/"))throw new Error("Please select a valid image file.");
+if(file.size>10*1024*1024)throw new Error("Image is too large. Please use an image under 10 MB.");
+
+const fd=new FormData();
+fd.append("file",file);
+fd.append("upload_preset",UPLOAD_PRESET);
+
+const response=await fetch("https://api.cloudinary.com/v1_1/"+CLOUD_NAME+"/image/upload",{method:"POST",body:fd});
+let data={};
+try{data=await response.json();}catch(_){}
+
+if(!response.ok){
+throw new Error(data?.error?.message||"Cloudinary upload failed. Make sure the 'medical' preset is Unsigned.");
+}
+if(!data.secure_url)throw new Error("Cloudinary did not return an image URL.");
+return data.secure_url;
+}
+
+slideForm.addEventListener("submit",async event=>{
+event.preventDefault();
+submitBtn.disabled=true;
+cancelBtn.disabled=true;
+showStatus("Saving...","info");
+
+try{
+let imageUrl=currentImageUrl;
+if(imageInput.files[0])imageUrl=await uploadImage(imageInput.files[0]);
+if(!imageUrl)throw new Error("Please choose an image.");
+if(!dateInput.value)throw new Error("Please select a date.");
+if(!startInput.value||!endInput.value)throw new Error("Start Time and End Time are required.");
+if(endInput.value<=startInput.value)throw new Error("End Time must be later than Start Time.");
+
+const calculatedDay=new Date(dateInput.value+"T00:00:00").toLocaleDateString("en-US",{weekday:"long"});
+dayInput.value=calculatedDay;
+
+const data={
+imageUrl,
+name:nameInput.value.trim(),
+day:calculatedDay,
+date:dateInput.value,
+startTime:startInput.value,
+endTime:endInput.value,
+subject:subjectInput.value.trim(),
+updatedAt:serverTimestamp()
+};
+
+if(!data.name||!data.subject)throw new Error("Name and Subject are required.");
+
+if(currentId){
+await updateDoc(doc(db,"slides",currentId),data);
+showStatus("Slide updated successfully.","success");
+}else{
+await addDoc(collection(db,"slides"),{...data,createdAt:serverTimestamp()});
+showStatus("Slide uploaded successfully.","success");
+}
+
+resetForm();
+await loadSlides();
+}catch(err){
+console.error(err);
+showStatus(err?.message||"Something went wrong.","danger");
+}finally{
+submitBtn.disabled=false;
+cancelBtn.disabled=false;
+}
+});
+
+async function loadSlides(){
+listBox.innerHTML='<tr><td colspan="6">Loading...</td></tr>';
+try{
+const snap=await getDocs(query(collection(db,"slides"),orderBy("createdAt","desc")));
+listBox.innerHTML="";
+
+snap.forEach(item=>{
+const p=item.data();
+const tr=document.createElement("tr");
+tr.innerHTML='<td><img class="preview" src="'+esc(p.imageUrl)+'" alt="'+esc(p.name)+'"></td>'+
+'<td>'+esc(p.name)+'</td>'+
+'<td>'+esc(p.day)+', '+esc(p.date)+'</td>'+
+'<td>'+esc(p.startTime)+' - '+esc(p.endTime)+'</td>'+
+'<td>'+esc(p.subject)+'</td>'+
+'<td><button type="button" class="btn btn-sm btn-outline-primary edit">Edit</button> '+
+'<button type="button" class="btn btn-sm btn-outline-danger delete">Delete</button></td>';
+
+tr.querySelector(".edit").addEventListener("click",()=>editSlide(item.id,p));
+tr.querySelector(".delete").addEventListener("click",()=>removeSlide(item.id));
+listBox.appendChild(tr);
+});
+
+if(snap.empty)listBox.innerHTML='<tr><td colspan="6">No slides uploaded.</td></tr>';
+}catch(err){
+console.error(err);
+listBox.innerHTML='<tr><td colspan="6" class="text-danger">Error: '+esc(err?.message||"Could not load slides.")+'</td></tr>';
+}
+}
+
+function editSlide(id,p){
+currentId=id;
+currentImageUrl=p.imageUrl||"";
+formTitle.textContent="Edit Slide";
+submitBtn.textContent="Update Slide";
+cancelBtn.classList.remove("d-none");
+nameInput.value=p.name||"";
+dateInput.value=p.date||"";
+dayInput.value=p.day||"";
+startInput.value=p.startTime||"";
+endInput.value=p.endTime||"";
+subjectInput.value=p.subject||"";
+statusBox.innerHTML="";
+window.scrollTo({top:0,behavior:"smooth"});
+}
+
+async function removeSlide(id){
+if(!confirm("Are you sure you want to delete this slide?"))return;
+try{
+await deleteDoc(doc(db,"slides",id));
+showStatus("Slide deleted from Firestore.","success");
+await loadSlides();
+}catch(err){
+console.error(err);
+showStatus(err?.message||"Could not delete the slide.","danger");
+}
+}
+</script>
+</body>
+</html>
